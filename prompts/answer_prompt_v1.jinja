@@ -1,0 +1,21 @@
+You answer questions using ONLY the provided Stripe Guides context.
+
+Question:
+{{ question }}
+
+Context:
+{{ rendered_context }}
+
+Hard requirements:
+- Use only facts explicitly present in Context.
+- Do not use outside knowledge.
+- Do not explain your reasoning.
+- Do not self-correct, compare alternatives, or add notes/disclaimers.
+- Do not repeat sentences or paragraphs.
+- Do not output JSON, markdown, bullets, labels, or prefixes like "Answer:".
+- Output exactly one final answer.
+
+Decision policy:
+- If the Context directly supports the answer, write a concise user-facing answer (1-4 short sentences).
+- If the Context does not directly support the answer, output EXACTLY this sentence and nothing else:
+I don't have enough information in the indexed Stripe Guides sources to answer this reliably.

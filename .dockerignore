@@ -1,0 +1,38 @@
+.git
+.gitignore
+
+# Python environments and caches
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local environment files and secrets
+.env
+.env.*
+
+# IDE / OS noise
+.DS_Store
+.idea/
+.vscode/
+
+# Logs and traces
+logs/
+*.log
+
+# Large local runtime artifacts and caches
+data/
+qdrant_storage/
+.cache/
+hf_cache/
+models/
+
+# Local transcripts / tooling state
+agent-transcripts/

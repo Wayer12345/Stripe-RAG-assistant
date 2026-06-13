@@ -1,0 +1,122 @@
+# pyproject.toml
+
+[build-system]
+requires = ["setuptools>=81,<82", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "stripe-rag-assistant"
+version = "0.1.0"
+description = "Local production-like RAG assistant over Stripe Guides"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+
+dependencies = [
+    "fastapi==0.136.3",
+    "uvicorn[standard]==0.49.0",
+    "pydantic==2.13.4",
+    "pydantic-settings==2.14.1",
+    "python-dotenv==1.2.2",
+    "pyyaml==6.0.3",
+    "qdrant-client==1.18.0",
+    "sentence-transformers==5.5.1",
+    "numpy==2.4.6",
+    "scikit-learn==1.9.0",
+    "rank-bm25==0.2.2",
+    "beautifulsoup4==4.14.3",
+    "lxml==6.1.1",
+    "pypdf==6.13.0",
+    "python-docx==1.2.0",
+    "pandas==3.0.3",
+    "httpx==0.28.1",
+    "jinja2==3.1.6",
+    "markdown==3.10.2",
+    "chardet==7.4.3",
+    "torch==2.12.0",
+]
+
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.3",
+    "pytest-asyncio==1.4.0",
+    "pytest-cov==7.1.0",
+    "pytest-mock==3.15.1",
+    "ruff==0.15.16",
+    "mypy==2.1.0",
+    "types-PyYAML==6.0.12.20260518",
+]
+
+
+[tool.setuptools]
+include-package-data = true
+
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["tests*", "docs*", "data*", "eval*", "scripts*", "venv*"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+markers = [
+    "unit: fast isolated unit tests",
+    "integration: multi-component integration tests",
+    "e2e: end-to-end smoke tests",
+    "qdrant: tests that require local Qdrant",
+    "ollama: tests that require local Ollama",
+    "slow: slow tests",
+]
+
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+omit = ["tests/*", "scripts/*"]
+
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+fail_under = 40
+
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["app", "tests", "scripts"]
+
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4", "PIE", "RUF"]
+ignore = ["E501"]
+
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+"scripts/**/*.py" = ["T201"]
+
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+files = ["app"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_return_any = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true

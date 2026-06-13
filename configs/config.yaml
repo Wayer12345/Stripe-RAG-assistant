@@ -1,0 +1,313 @@
+# Unified project configuration.
+# This file consolidates the previously split configs:
+# default, ingestion, cleaning, chunking, embeddings, vector_store,
+# retrieval, reranking, generation, eval, and local.
+
+app:
+  name: "stripe-rag-assistant"
+  environment: "local"
+  log_level: "INFO"
+
+paths:
+  raw_dir: "data/raw"
+  interim_dir: "data/interim"
+  processed_dir: "data/processed"
+  indexes_dir: "data/indexes"
+  manifests_dir: "data/manifests"
+  eval_dir: "eval"
+
+ingestion:
+  input_dir: "data/raw"
+  recursive: true
+  supported_extensions:
+    - ".txt"
+    - ".md"
+    - ".markdown"
+    - ".html"
+    - ".htm"
+    - ".pdf"
+    - ".docx"
+    - ".json"
+    - ".jsonl"
+    - ".csv"
+  outputs:
+    parsed_documents_path: "data/interim/parsed_documents.jsonl"
+    cleaned_documents_path: "data/interim/cleaned_documents.jsonl"
+    manifest_path: "data/manifests/ingestion_manifest.json"
+  failure_policy:
+    continue_on_resolve_error: true
+    continue_on_parse_error: true
+    continue_on_clean_error: true
+    fail_on_empty_input: false
+  parser_options:
+    txt:
+      encoding: "utf-8"
+      fallback_errors: "replace"
+    markdown:
+      encoding: "utf-8"
+      fallback_errors: "replace"
+    html:
+      remove_script_style: true
+      preserve_visible_text: true
+    pdf:
+      preserve_page_markers: true
+      page_marker_template: "[Page {page_number}]"
+    docx:
+      extract_tables: true
+    json:
+      text_fields:
+        - "text"
+        - "content"
+        - "body"
+        - "markdown"
+        - "html"
+        - "answer"
+        - "description"
+      title_fields:
+        - "title"
+        - "name"
+        - "heading"
+        - "question"
+    csv:
+      delimiter: null
+      include_headers: true
+
+cleaning:
+  mode: "conservative"
+  outputs:
+    manifest_path: "data/manifests/cleaning_manifest.json"
+  steps:
+    normalize_unicode: true
+    remove_html_artifacts: true
+    remove_boilerplate: true
+    normalize_whitespace: true
+    remove_duplicate_lines: true
+  duplicate_lines:
+    window_size: 5
+  blank_lines:
+    max_blank_lines: 1
+  boilerplate:
+    remove_standalone_lines: true
+    max_line_length: 80
+    phrases:
+      - "Sign in"
+      - "Log in"
+      - "Contact sales"
+      - "Contact us"
+      - "Cookie settings"
+      - "Privacy"
+      - "Privacy policy"
+      - "Terms"
+      - "Terms of service"
+      - "Documentation"
+      - "Docs"
+      - "Support"
+      - "Pricing"
+      - "Resources"
+      - "Company"
+      - "Developers"
+  quality:
+    overcleaning_threshold: 0.10
+    undercleaning_threshold_for_html: 0.95
+    fail_on_empty_output: true
+    warn_on_possible_overcleaning: true
+    warn_on_possible_undercleaning: true
+  preserve:
+    headings: true
+    lists: true
+    faq_markers: true
+    table_like_lines: true
+    page_markers: true
+    urls_in_meaningful_lines: true
+
+chunking:
+  strategy: "semantic"
+  input_path: "data/interim/cleaned_documents.jsonl"
+  outputs:
+    chunks_path: "data/processed/chunks.jsonl"
+    manifest_path: "data/manifests/chunking_manifest.json"
+  chunk_size: 1800
+  chunk_size_min: 300
+  chunk_size_max: 1800
+  chunk_overlap: 250
+  min_chunk_chars: 1
+  max_chunk_chars: 1800
+  overlap_chars: 250
+  max_overlap_units: 3
+  use_semantic_boundaries: false
+  similarity_threshold: 0.55
+  boundary_embedding_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  unit_embed_batch_size: 32
+
+embeddings:
+  provider: "sentence_transformers"
+  model_name: "BAAI/bge-small-en-v1.5"
+  batch_size: 32
+  normalize_embeddings: true
+  prefix_mode: "bge"
+  cache_enabled: true
+  cache_path: "data/indexes/embedding_cache"
+  input_path: "data/processed/chunks.jsonl"
+  output_path: "data/processed/embedded_chunks.jsonl"
+  manifest_path: "data/manifests/embedding_manifest.json"
+
+vector_store:
+  provider: "qdrant"
+  mode: "embedded"
+  local_path: "data/indexes/qdrant"
+  host: "localhost"
+  port: 6333
+  url: null
+  api_key: null
+  prefer_grpc: false
+  collection_name: "stripe_guides_v1"
+  distance: "cosine"
+  timeout: 30
+  recreate_collection: false
+  create_payload_indexes: true
+  upsert_batch_size: 64
+  wait: true
+  payload_indexes:
+    document_id: "keyword"
+    url: "keyword"
+    category: "keyword"
+    source_type: "keyword"
+    content_hash: "keyword"
+    token_count: "integer"
+    source_path: "keyword"
+    chunk_id: "keyword"
+
+indexing:
+  input_path: "data/processed/embedded_chunks.jsonl"
+  manifest_path: "data/manifests/index_manifest.json"
+  recreate_collection: false
+  create_payload_indexes: true
+  upsert_batch_size: 64
+  validate_after_upsert: true
+  validate_only: false
+
+retrieval:
+  strategy: "dense"
+  dense_top_k: 30
+  write_trace: true
+  trace_dir: "data/traces/queries"
+
+reranking:
+  enabled: true
+  provider: "cross_encoder"
+  model_name: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+  top_k_before: 12
+  top_k_after: 8
+  batch_size: 12
+  max_query_chars: 512
+  max_pair_chars: 1800
+  warmup_enabled: true
+  cache_enabled: true
+  cache_path: "data/indexes/reranker_cache"
+  latency_budget_ms: 50
+  on_latency_budget_exceeded: "warn"
+  write_trace: true
+  trace_dir: "data/traces/queries"
+  text_preview_chars: 300
+
+context:
+  token_budget: 3500
+  max_chunks: 4
+  max_sources: 5
+  min_chunk_tokens: 20
+  max_chunk_tokens: 700
+  truncate_long_chunks: true
+  deduplicate_by:
+    - chunk_id
+    - text_hash
+    - url
+  include_scores: true
+  include_metadata: true
+  context_format_version: "context_v1"
+  write_trace: true
+  trace_dir: "data/traces/queries"
+  text_preview_chars: 500
+  include_full_context_in_trace: true
+
+generation:
+  provider: "ollama"
+  base_url: "http://localhost:11434"
+  model_name: "llama3.1:8b"
+  temperature: 0.1
+  max_tokens: 700
+  keep_alive: "30m"
+  top_p: null
+  timeout_seconds: 120
+  context_token_budget: 3500
+  min_context_tokens: 1
+  prompts_dir: "prompts"
+  answer_template_name: "answer_prompt_v1.jinja"
+  no_answer_template_name: "no_answer_prompt_v1.jinja"
+  write_trace: true
+  trace_dir: "data/traces/queries"
+  text_preview_chars: 500
+  include_full_prompt_in_trace: false
+  include_raw_output_in_trace: false
+  include_full_answer_in_trace: false
+  no_answer_quality_threshold_pct: 50.0
+
+online_query:
+  write_trace: true
+  trace_dir: "data/traces/queries"
+  text_preview_chars: 500
+  include_full_answer_in_trace: false
+  print_answer_by_default: true
+  print_sources_by_default: true
+  fail_fast: true
+
+api:
+  enabled: true
+  title: "Stripe RAG Assistant"
+  version: "0.1.0"
+  debug: false
+  warmup_on_startup: true
+  fail_startup_on_warmup_error: false
+  shutdown_on_exit: true
+  warmup:
+    retrieval_enabled: true
+    retrieval_embed_query_enabled: true
+    retrieval_embed_query_text: "warmup query"
+    retrieval_tiny_search_enabled: false
+    retrieval_tiny_search_top_k: 1
+    reranker_enabled: true
+    context_enabled: true
+    generation_enabled: true
+    ollama_healthcheck_enabled: true
+    ollama_generate_enabled: true
+    ollama_generate_prompt: "Respond with: OK"
+    ollama_generate_max_tokens: 8
+    qdrant_healthcheck_enabled: true
+
+eval:
+  datasets_dir: "data/eval/datasets"
+  runs_dir: "data/eval/runs"
+  baselines_dir: "data/eval/baselines"
+  default_suite: "full"
+  default_limit: null
+  default_seed: 42
+  default_synthetic_target_size: 200
+  default_negative_target_size: 25
+  default_robustness_target_size: 50
+  default_audit_target_size: 50
+  min_chunk_chars: 300
+  write_trace: false
+  fail_fast: false
+  judge_enabled: false
+  judge_backend: "heuristic"
+  text_preview_chars: 500
+  preflight:
+    enabled: true
+    require_qdrant_healthcheck: true
+    require_embed_query_warmup: true
+    retrieval_warmup_query: "warmup query"
+    require_tiny_search_warmup: true
+    tiny_search_top_k: 1
+    require_ollama_healthcheck: true
+    require_ollama_generate_warmup: true
+    ollama_generate_prompt: "Respond with: OK"
+    ollama_generate_max_tokens: 8
